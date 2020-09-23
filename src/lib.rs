@@ -2,13 +2,13 @@ use std::time::{Instant, Duration};
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
-pub enum Memoized<T, F: FnMut() -> T> {
-    UnInitialized(Box<F>),
+pub enum Memoized<'a, T> {
+    UnInitialized(Box<'a + FnMut() -> T>),
     Data(T),
 }
 
-impl<T, F: FnMut() -> T> Memoized<T, F> {
-    pub fn new(f: F) -> Self {
+impl<'a, T> Memoized<'a, T> {
+    pub fn new<F: 'a + FnMut() -> T>(f: F) -> Self {
         Self::UnInitialized(Box::new(f))
     }
 
@@ -26,19 +26,19 @@ impl<T, F: FnMut() -> T> Memoized<T, F> {
     }
 }
 
-pub struct MemoizedWithExpiration<T, F: FnMut() -> T> {
+pub struct MemoizedWithExpiration<'a, T> {
     duration: Duration,
     last: Instant,
-    f: F,
+    f: Box<'a + FnMut() -> T>,
     t: Option<Rc<T>>,
 }
 
-impl<T, F: FnMut() -> T> MemoizedWithExpiration<T, F> {
-    pub fn new(f: F, duration: Duration) -> Self {
+impl<'a, T> MemoizedWithExpiration<'a, T> {
+    pub fn new<F: 'a + FnMut() -> T>(f: F, duration: Duration) -> Self {
         Self {
             duration,
             last: Instant::now(),
-            f,
+            f: Box::new(f),
             t: None,
         }
     }
@@ -51,11 +51,11 @@ impl<T, F: FnMut() -> T> MemoizedWithExpiration<T, F> {
     }
 }
 
-pub fn memoize<T, F: FnMut() -> T>(f: F) -> Memoized<T, F> {
+pub fn memoize<'a, T, F: 'a + FnMut() -> T>(f: F) -> Memoized<'a, T> {
     Memoized::new(f)
 }
 
-pub fn memoize_with_expiration<T, F: FnMut() -> T>(f: F, duration: Duration) -> MemoizedWithExpiration<T, F> {
+pub fn memoize_with_expiration<'a, T, F: 'a + FnMut() -> T>(f: F, duration: Duration) -> MemoizedWithExpiration<'a, T> {
     MemoizedWithExpiration::new(f, duration)
 }
 
