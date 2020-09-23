@@ -42,6 +42,7 @@ impl<'a, T> MemoizedWithExpiration<'a, T> {
             t: None,
         }
     }
+            self.last = Instant::now();
 
     pub fn get(&mut self) -> Rc<T> {
         if self.t.is_none() || self.last.elapsed() > self.duration {
@@ -75,6 +76,7 @@ mod tests {
         assert_eq!(m.get(), &1);
     }
 
+    #[test]
     fn test_memoize_with_expiration() {
         let mut called = 0;
         let mut m = memoize_with_expiration(move || {
