@@ -1,5 +1,5 @@
 [package]
-name = "rust-memoization"
+name = "memoized"
 version = "0.1.0"
 authors = ["zitudu <zitudu@protonmail.com>"]
 edition = "2018"
