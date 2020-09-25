@@ -39,12 +39,12 @@ pub fn memoize<'a, I, T, F: 'a + FnMut(I) -> T>(f: F) -> Memoized<'a, I, T> {
 pub struct MemoizedWithExpiration<'a, I, T> {
     duration: Duration,
     last: Instant,
-    f: Box<'a + FnMut(I) -> T>,
+    f: Box<dyn 'a + FnMut(I) -> std::result::Result<T, ()>>,
     t: Option<Rc<T>>,
 }
 
 impl<'a, I, T> MemoizedWithExpiration<'a, I, T> {
-    pub fn new<F: 'a + FnMut(I) -> T>(f: F, duration: Duration) -> Self {
+    pub fn new<F: 'a + FnMut(I) -> std::result::Result<T, ()>>(f: F, duration: Duration) -> Self {
         Self {
             duration,
             last: Instant::now(),
@@ -55,14 +55,20 @@ impl<'a, I, T> MemoizedWithExpiration<'a, I, T> {
 
     pub fn get(&mut self, input: I) -> Rc<T> {
         if self.t.is_none() || self.last.elapsed() > self.duration {
-            self.t = Some(Rc::new((self.f)(input)));
-            self.last = Instant::now();
+            let maybeT: std::result::Result<T, ()> = (self.f)(input);
+            match maybeT {
+                Ok(t) => {
+                    self.t = Some(Rc::new(t));
+                    self.last = Instant::now();
+                }
+                Err(_) => {}
+            }
         }
         Rc::clone(self.t.as_ref().unwrap())
     }
 }
 
-pub fn memoize_with_expiration<'a, I, T, F: 'a + FnMut(I) -> T>(f: F, duration: Duration) -> MemoizedWithExpiration<'a, I, T> {
+pub fn memoize_with_expiration<'a, I, T, F: 'a + FnMut(I) -> std::result::Result<T, ()>>(f: F, duration: Duration) -> MemoizedWithExpiration<'a, I, T> {
     MemoizedWithExpiration::new(f, duration)
 }
 
@@ -88,7 +94,7 @@ mod tests {
         let mut called = 0;
         let mut m = memoize_with_expiration(move |()| {
             called += 1;
-            called
+            Ok(called)
         }, Duration::from_secs(1));
         for _ in 0..1000 {
             assert_eq!(m.get(()), Rc::new(1));
@@ -125,7 +131,7 @@ mod tests {
         let mut m = M {
             d: 0,
             m: memoize_with_expiration(|d: Box<i32>| {
-                *d + 1
+                Ok(*d + 1)
             }, Duration::from_secs(1)),
         };
         assert_eq!(m.m.get(Box::new(m.d)), Rc::new(1));
